@@ -2,18 +2,22 @@ package io.github.lishijiedev.wanqimap.phone
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
-import android.widget.Toast
 
 /**
  * 手机端唯一界面：填高德 Key → 粘贴/接收高德分享链接 → 解析出目的地 → 通过 BLE 推送给手表。
@@ -25,7 +29,7 @@ import android.widget.Toast
  * 三种进入方式：
  *   1. 在高德里「分享」到本应用（ACTION_SEND）
  *   2. 直接点开 surl.amap.com 分享链接（ACTION_VIEW）
- *   3. 手动粘贴到输入框
+ *   3. 手动粘贴到输入框 —— 落框即自动解析，不需要再点任何按钮
  *
  * 推送流程（全程由 [activePush] 这一个状态驱动，不依赖任何定时器）：
  *
@@ -36,6 +40,10 @@ import android.widget.Toast
  *
  * 所以只有「确实有一个没走完的任务」时才会有广播：没点过推送、或已经推完，
  * 怎么来回切前后台都不会广播。
+ *
+ * 「当前在干什么」只有一个出口：操作按钮下方那行 [textStatus]。
+ * 唯一的例外是蓝牙权限被「拒绝且不再询问」—— 系统此后不再弹框，只能请用户去设置里开，
+ * 那是必须打断他的一次弹窗。
  */
 class MainActivity : Activity() {
 
@@ -45,19 +53,33 @@ class MainActivity : Activity() {
 
         /** 保存「未完成的推送任务」，供界面被系统回收后重建时恢复。 */
         private const val KEY_ACTIVE_PUSH = "key_active_push"
+
+        /** 输入停手多久才认为用户粘完了 —— 避免边打字边往短链发请求。 */
+        private const val AUTO_PARSE_DELAY_MS = 500L
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    // 高德 Key 区：已设置时收成一行，展开态才是输入框
+    private lateinit var keyCollapsed: View
+    private lateinit var keyExpanded: View
     private lateinit var editApiKey: EditText
+    private lateinit var btnSaveKey: Button
+    private lateinit var btnCancelKey: Button
     private lateinit var textKeyState: TextView
+
+    // 链接、解析结果与主操作
     private lateinit var editLink: EditText
-    private lateinit var textResult: TextView
-    private lateinit var textStatus: TextView
-    private lateinit var btnParse: Button
+    private lateinit var resultCard: View
+    private lateinit var textResultName: TextView
+    private lateinit var textResultAddress: TextView
     private lateinit var btnPush: Button
     private lateinit var btnStop: Button
-    private lateinit var btnSaveKey: Button
+    private lateinit var textStatus: TextView
+
+    // 推送进度：三步逐条点亮
+    private lateinit var pushSteps: View
+    private val stepViews = LinkedHashMap<PushStep, TextView>()
 
     private var parsed: Destination? = null
     private var gattServer: DestinationGattServer? = null
@@ -75,6 +97,11 @@ class MainActivity : Activity() {
     /** 等权限结果时临时存一下，授权后立刻转入 [activePush]。 */
     private var pendingPush: Destination? = null
 
+    /** 上次送去解析的原文，用来避免自动解析对同一段文本重复发请求。 */
+    private var lastParsedInput: String? = null
+
+    private val autoParse = Runnable { startParsing(editLink.text.toString(), notifyIfNoKey = false) }
+
     private val blePermissions: Array<String> =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             arrayOf(Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT)
@@ -86,30 +113,38 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        keyCollapsed = findViewById(R.id.keyCollapsed)
+        keyExpanded = findViewById(R.id.keyExpanded)
         editApiKey = findViewById(R.id.editApiKey)
+        btnSaveKey = findViewById(R.id.btnSaveKey)
+        btnCancelKey = findViewById(R.id.btnCancelKey)
         textKeyState = findViewById(R.id.textKeyState)
+
         editLink = findViewById(R.id.editLink)
-        textResult = findViewById(R.id.textResult)
-        textStatus = findViewById(R.id.textStatus)
-        btnParse = findViewById(R.id.btnParse)
+        resultCard = findViewById(R.id.resultCard)
+        textResultName = findViewById(R.id.textResultName)
+        textResultAddress = findViewById(R.id.textResultAddress)
         btnPush = findViewById(R.id.btnPush)
         btnStop = findViewById(R.id.btnStop)
-        btnSaveKey = findViewById(R.id.btnSaveKey)
+        textStatus = findViewById(R.id.textStatus)
+
+        pushSteps = findViewById(R.id.pushSteps)
+        stepViews[PushStep.ADVERTISING] = findViewById(R.id.stepAdvertising)
+        stepViews[PushStep.SENDING] = findViewById(R.id.stepSending)
+        stepViews[PushStep.CONFIRMING] = findViewById(R.id.stepConfirming)
 
         // 回填已保存的 Key，方便核对与修改
         editApiKey.setText(AmapKeyStore.load(this))
+        // 改了框里的内容就要如实反映（见 refreshKeyState）
+        editApiKey.addTextChangedListener(onApiKeyChanged)
+        keyCollapsed.setOnClickListener { expandKeySection() }
         btnSaveKey.setOnClickListener { saveApiKey() }
+        btnCancelKey.setOnClickListener { cancelKeyEdit() }
 
-        btnParse.setOnClickListener { startParsing(editLink.text.toString()) }
+        // 粘贴/输入链接后自动解析，不用再点按钮
+        editLink.addTextChangedListener(onLinkChanged)
         btnPush.setOnClickListener { onPushClicked() }
-        btnStop.setOnClickListener {
-            // 用户主动放弃本次任务：清状态 + 关广播，之后回到前台也不会再自动广播
-            activePush = null
-            gattServer?.close()
-            gattServer = null
-            status("已停止等待")
-            setWaiting(false)
-        }
+        btnStop.setOnClickListener { stopWaiting() }
 
         // 界面被系统回收后重建：恢复还没送达的推送任务，onStart 会接着开广播
         savedInstanceState?.getString(KEY_ACTIVE_PUSH)?.let { json ->
@@ -117,9 +152,23 @@ class MainActivity : Activity() {
         }
 
         refreshKeyState()
-        // 一进应用就把「必须先设 Key」讲清楚；提示文案只有 requireApiKey() 那一份，各入口复用
-        requireApiKey()
         handleIntent(intent)
+    }
+
+    private val onApiKeyChanged = object : TextWatcher {
+        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+        override fun afterTextChanged(s: Editable?) = refreshKeyState()
+    }
+
+    /** 链接框变化：停手 [AUTO_PARSE_DELAY_MS] 后自动解析一次。 */
+    private val onLinkChanged = object : TextWatcher {
+        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+        override fun afterTextChanged(s: Editable?) {
+            mainHandler.removeCallbacks(autoParse)
+            mainHandler.postDelayed(autoParse, AUTO_PARSE_DELAY_MS)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -176,36 +225,84 @@ class MainActivity : Activity() {
     private fun saveApiKey() {
         val key = editApiKey.text.toString().trim()
         if (!AmapKeyStore.isValidFormat(key)) {
-            status(getString(R.string.status_key_invalid))
+            status(getString(R.string.key_state_invalid))
             return
         }
         AmapKeyStore.save(this, key)
         editApiKey.setText(key)
         status(getString(R.string.status_key_saved))
         refreshKeyState()
+        // 之前因为没 Key 而没解析成的链接，这时补解析一次（内容没变过，所以只有这一处能救回来）
+        startParsing(editLink.text.toString(), notifyIfNoKey = false)
+    }
+
+    /** 展开 Key 输入区：点折叠态那一行，或缺少 Key 时自动展开。 */
+    private fun expandKeySection() {
+        keyCollapsed.visibility = View.GONE
+        keyExpanded.visibility = View.VISIBLE
+    }
+
+    /** 放弃本次编辑，退回已保存的 Key（随后 [refreshKeyState] 会把它收成一行）。 */
+    private fun cancelKeyEdit() {
+        editApiKey.setText(AmapKeyStore.load(this))
+        refreshKeyState()
     }
 
     private fun hasApiKey(): Boolean = AmapKeyStore.isValidFormat(AmapKeyStore.load(this))
 
     /**
-     * 没 Key 就不允许解析/推送 —— 否则推过去手表也只会是一张空白地图。
+     * 按「输入框内容 vs 已保存的值」决定 Key 区的形态与提示。
      *
-     * 状态直接写在 Key 输入框下面（红/绿），比按钮置灰更容易被看见。
+     * 关键在于**不能只看已保存的 Key**：用户改了框里的内容却没点保存时，若状态行还写着
+     * 「已设置」，他会以为新 Key 已经生效 —— 而实际推送给手表的仍是旧 Key，手表鉴权失败，
+     * 手机端却一切正常。改过就如实说「与已保存的 Key 不一致」。
+     *
+     * 形态上：已保存且没改动 ⇒ 收成一行；其余情况一律展开，让提示和输入框都在眼前。
      */
     private fun refreshKeyState() {
-        val ready = hasApiKey()
-        btnParse.isEnabled = ready
-        if (!ready) btnPush.isEnabled = false
-        textKeyState.setText(if (ready) R.string.key_state_set else R.string.key_state_missing)
-        textKeyState.setTextColor(
-            getColor(if (ready) R.color.key_state_set else R.color.key_state_missing)
-        )
+        val saved = AmapKeyStore.load(this)
+        val typed = editApiKey.text.toString().trim()
+        val keyReady = AmapKeyStore.isValidFormat(saved)
+
+        btnPush.isEnabled = keyReady && parsed != null && activePush == null
+
+        if (keyReady && typed == saved) {
+            keyCollapsed.visibility = View.VISIBLE
+            keyExpanded.visibility = View.GONE
+            return
+        }
+        expandKeySection()
+
+        val stateText: Int
+        val stateColor: Int
+        when {
+            typed.isNotEmpty() && !AmapKeyStore.isValidFormat(typed) -> {
+                stateText = R.string.key_state_invalid
+                stateColor = R.color.key_state_missing
+            }
+            keyReady -> {
+                stateText = R.string.key_state_dirty
+                stateColor = R.color.key_state_dirty
+            }
+            else -> {
+                stateText = R.string.key_state_missing
+                stateColor = R.color.key_state_missing
+            }
+        }
+        textKeyState.setText(stateText)
+        textKeyState.setTextColor(getColor(stateColor))
+        btnSaveKey.isEnabled = AmapKeyStore.isValidFormat(typed) && typed != saved
+        btnCancelKey.visibility = if (keyReady) View.VISIBLE else View.GONE
     }
 
-    /** 所有「必须有 Key 才能做」的入口统一走这里，保证提示只有一份。 */
+    /**
+     * 没有 Key 就不允许解析/推送。所有「必须有 Key 才能做」的入口统一走这里，
+     * 保证提示只有一份 —— 而且只写状态行，不弹 Toast：状态行就在操作按钮下方。
+     */
     private fun requireApiKey(): Boolean {
         if (hasApiKey()) return true
-        Toast.makeText(this, R.string.toast_need_api_key, Toast.LENGTH_LONG).show()
+        refreshKeyState()   // 展开 Key 区，把那行红字提示摆出来
+        status(getString(R.string.status_need_api_key))
         return false
     }
 
@@ -223,53 +320,71 @@ class MainActivity : Activity() {
 
         Log.d(TAG, "received share: $shared")
         editLink.setText(shared)
-        startParsing(shared)
+        // setText 会触发输入框的防抖解析，但用户刚从高德分享进来，立刻解析、不再等那半秒
+        mainHandler.removeCallbacks(autoParse)
+        startParsing(shared, notifyIfNoKey = true)
     }
 
     // ------------------------------------------------------------------ 解析
 
-    private fun startParsing(rawText: String) {
-        if (!requireApiKey()) return
-        if (rawText.isBlank()) {
-            status("请先粘贴高德分享链接")
+    /**
+     * 解析并展示目的地。
+     *
+     * [notifyIfNoKey] 区分两种触发：用户主动（从高德分享进来）没 Key 要明确告诉他被挡住了；
+     * 输入框自动触发时则安静跳过 —— Key 区本来就摆着红字，没必要边打字边提示。
+     */
+    private fun startParsing(rawText: String, notifyIfNoKey: Boolean) {
+        val raw = rawText.trim()
+        if (raw.isEmpty()) {
+            clearParsed()
+            status(getString(R.string.status_idle))
             return
         }
-        parsed = null
-        btnPush.isEnabled = false
-        textResult.text = ""
-        status("正在解析…（短链需要联网跟随跳转）")
-        btnParse.isEnabled = false
+        if (raw == lastParsedInput) return
+        if (!hasApiKey()) {
+            if (notifyIfNoKey) requireApiKey()
+            return
+        }
+        lastParsedInput = raw
+
+        clearParsed()
+        status(getString(R.string.status_parsing))
 
         Thread {
-            val outcome = runCatching { AmapShareLinkParser.parse(rawText) }
+            val outcome = runCatching { AmapShareLinkParser.parse(raw) }
             mainHandler.post {
-                btnParse.isEnabled = hasApiKey()
                 outcome
                     .onSuccess { result -> showParsed(result) }
                     .onFailure { error ->
                         Log.w(TAG, "parse failed", error)
-                        status("解析失败：${error.message}")
+                        status(getString(R.string.status_parse_failed, error.message.orEmpty()))
                     }
             }
         }.start()
+    }
+
+    /** 上一次的解析结果与进度一并作废：开始新一次解析时它们就该翻篇。 */
+    private fun clearParsed() {
+        parsed = null
+        btnPush.isEnabled = false
+        resultCard.visibility = View.GONE
+        pushSteps.visibility = View.GONE
     }
 
     private fun showParsed(result: AmapShareLinkParser.Result) {
         val destination = result.destination
         parsed = destination
         btnPush.isEnabled = true
-        textResult.text = buildString {
-            append("名称：").append(destination.name.ifBlank { "（未提供）" }).append('\n')
-            if (destination.address.isNotBlank()) {
-                append("地址：").append(destination.address).append('\n')
-            }
-            append("纬度：").append(destination.latitude).append('\n')
-            append("经度：").append(destination.longitude).append('\n')
-            if (destination.poiId.isNotBlank()) {
-                append("POI：").append(destination.poiId)
-            }
-        }
-        status("解析成功（${result.trace}），可以推送到手表了")
+
+        // 只展示用户要确认的两项：是不是这个地方。坐标与 POI 对他没有意义
+        textResultName.text = destination.name.ifBlank { getString(R.string.result_name_missing) }
+        textResultAddress.text = destination.address
+        textResultAddress.visibility = if (destination.address.isBlank()) View.GONE else View.VISIBLE
+        resultCard.visibility = View.VISIBLE
+
+        // 命中第几跳只对排查有意义，留在日志里，不占用户视线
+        Log.d(TAG, "parsed at ${result.trace}: $destination")
+        status(getString(R.string.status_parsed))
     }
 
     // ------------------------------------------------------------------ 推送
@@ -298,8 +413,41 @@ class MainActivity : Activity() {
         if (granted && destination != null) {
             pushToWatch(destination)
         } else {
-            status("缺少蓝牙权限，无法推送")
+            handleBlePermissionDenied()
         }
+    }
+
+    /**
+     * 蓝牙权限没拿到。
+     *
+     * 必须区分「刚拒绝、下次还会弹框」与「拒绝且不再询问」：后者系统**不会再弹框**，
+     * 再点推送只会看到一个没有原因的失败 —— 用户除了卸载重装没有别的出路。
+     * 所以这种时候要把系统设置页送到他面前。
+     */
+    private fun handleBlePermissionDenied() {
+        val willNotAskAgain = blePermissions.any {
+            checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED &&
+                    !shouldShowRequestPermissionRationale(it)
+        }
+        if (!willNotAskAgain) {
+            status(getString(R.string.status_ble_permission_denied))
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.dialog_ble_permission_title)
+            .setMessage(R.string.dialog_ble_permission_message)
+            .setPositiveButton(R.string.action_open_settings) { _, _ -> openAppSettings() }
+            .setNegativeButton(R.string.action_cancel, null)
+            .show()
+    }
+
+    private fun openAppSettings() {
+        startActivity(
+            Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.fromParts("package", packageName, null)
+            )
+        )
     }
 
     private fun pushToWatch(destination: Destination) {
@@ -307,29 +455,26 @@ class MainActivity : Activity() {
         // 才知道该用哪个 Key —— 它在启动导航引擎之前把 Key 注入给高德 SDK。
         val payload = destination.toJson(AmapKeyStore.load(this)).toByteArray(Charsets.UTF_8)
         if (payload.size > BleProtocol.MAX_PAYLOAD_BYTES) {
-            status("目的地信息过长（${payload.size} 字节），无法通过蓝牙传输")
+            status(getString(R.string.status_payload_too_long, payload.size))
             return
         }
 
         gattServer?.close()
         activePush = destination
         setWaiting(true)
-        status("正在开启蓝牙广播…")
+        showSteps()
+        status(getString(R.string.status_opening_ble))
 
         val server = DestinationGattServer(
             context = this,
             payload = payload,
-            onStatus = { message ->
-                status(message)
-                if (message.startsWith("已送达") || message.startsWith("蓝牙广播开启失败")) {
-                    // 任务到此结束：已送达；或广播根本开不起来（重试也没有意义）。
-                    // 清掉任务状态后，页面再回到前台就不会重新广播。
-                    activePush = null
-                    setWaiting(false)
-                }
-            },
-            onDelivered = {
-                Toast.makeText(this, "已推送到手表", Toast.LENGTH_SHORT).show()
+            onStatus = { message -> status(message) },
+            onStep = { step, state -> showStep(step, state) },
+            onFinished = { _ ->
+                // 任务到此结束：已送达，或失败（重试也没有意义）。清掉任务状态后，
+                // 页面再回到前台就不会重新广播。具体结果由 onStatus 写进状态行。
+                activePush = null
+                setWaiting(false)
             }
         )
         gattServer = server
@@ -340,6 +485,16 @@ class MainActivity : Activity() {
         }
     }
 
+    /** 用户主动放弃本次任务：清状态 + 关广播，之后回到前台也不会再自动广播。 */
+    private fun stopWaiting() {
+        activePush = null
+        gattServer?.close()
+        gattServer = null
+        setWaiting(false)
+        pushSteps.visibility = View.GONE
+        status(getString(R.string.status_stopped))
+    }
+
     private fun setWaiting(waiting: Boolean) {
         btnPush.isEnabled = !waiting && parsed != null
         btnStop.isEnabled = waiting
@@ -348,6 +503,32 @@ class MainActivity : Activity() {
 
     private fun hasBlePermissions(): Boolean =
         blePermissions.all { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
+
+    // ------------------------------------------------------------------ 推送进度
+
+    /** 点推送时把进度列表摆出来，三步全部回到「待办」。 */
+    private fun showSteps() {
+        stepViews.keys.forEach { showStep(it, StepState.TODO) }
+        pushSteps.visibility = View.VISIBLE
+    }
+
+    /**
+     * 更新某一步的状态。
+     *
+     * 用「符号 + 颜色」同时表达，是为了让用户一眼看出**现在卡在哪一步** ——
+     * 例如第三步迟迟不亮，说明手表没回执，而不是手机没发出去。
+     */
+    private fun showStep(step: PushStep, state: StepState) {
+        val view = stepViews[step] ?: return
+        val mark = if (state == StepState.TODO) "○" else "●"
+        val colorRes = when (state) {
+            StepState.TODO -> R.color.step_todo
+            StepState.ACTIVE -> R.color.step_active
+            StepState.DONE -> R.color.step_done
+        }
+        view.text = "$mark ${getString(step.labelRes)}"
+        view.setTextColor(getColor(colorRes))
+    }
 
     private fun status(message: String) {
         textStatus.text = message

@@ -2,20 +2,41 @@
     <string name="app_name">腕骑地图</string>
 
     <string name="hint_input">粘贴高德分享链接，或从高德「分享」直接发到本应用</string>
-    <string name="action_parse">解析链接</string>
     <string name="action_push">推送到手表</string>
     <string name="action_stop">停止等待</string>
+    <string name="action_cancel">取消</string>
 
-    <string name="status_idle">等待解析…</string>
+    <string name="status_idle">等待粘贴高德分享链接…</string>
+    <string name="status_parsing">正在解析…（短链需要联网跟随跳转）</string>
+    <string name="status_parsed">解析成功，可以推送到手表了</string>
+    <string name="status_stopped">已停止等待</string>
+    <string name="status_opening_ble">正在开启蓝牙广播…</string>
+    <string name="status_payload_too_long">目的地信息过长（%1$d 字节），无法通过蓝牙传输</string>
 
     <!-- 高德 Key：由使用者自行到高德开放平台申请，手表端导航靠它通过鉴权。
          没设置时手机端不允许解析与推送 —— 「必须先设 Key 才能用」就落在这里。 -->
     <string name="label_api_key">高德 Key（必填）</string>
     <string name="hint_api_key">32 位十六进制，在高德开放平台「Android 平台」的 Key 里复制</string>
     <string name="action_save_key">保存 Key</string>
+    <string name="action_edit_key">修改</string>
+    <string name="key_saved_short">高德 Key 已设置</string>
     <string name="key_state_missing">未设置 —— 手表导航无法通过高德鉴权，解析与推送已禁用</string>
-    <string name="key_state_set">已设置</string>
-    <string name="status_key_saved">Key 已保存，可以推送目的地了</string>
-    <string name="status_key_invalid">Key 格式不对：应为 32 位十六进制字符（0-9、a-f）</string>
-    <string name="toast_need_api_key">请先填写并保存高德 Key，否则无法使用本应用</string>
+    <string name="key_state_invalid">格式不对 —— 应为 32 位十六进制字符（0-9、a-f）</string>
+    <string name="key_state_dirty">与已保存的 Key 不一致 —— 点「保存 Key」后才会生效</string>
+    <string name="status_key_saved">Key 已保存</string>
+    <string name="status_need_api_key">请先填写并保存高德 Key —— 手表端导航需要它才能通过高德鉴权</string>
+
+    <!-- 推送进度：三步逐条点亮，用户能看出到底卡在哪一步 -->
+    <string name="step_advertising">开启蓝牙广播，等待手表连接</string>
+    <string name="step_sending">正在把目的地传送给手表</string>
+    <string name="step_confirming">等待手表回执确认</string>
+
+    <!-- 蓝牙权限被「拒绝且不再询问」后系统不会再弹框，只能引导用户去设置里手动开 -->
+    <string name="dialog_ble_permission_title">需要蓝牙权限</string>
+    <string name="dialog_ble_permission_message">推送目的地需要「附近的设备」权限。它此前被拒绝，系统已不再弹窗询问，需要到应用设置里手动打开。</string>
+    <string name="action_open_settings">去设置</string>
+    <string name="status_ble_permission_denied">缺少蓝牙权限，无法推送</string>
+
+    <string name="result_name_missing">（未提供名称）</string>
+    <string name="status_parse_failed">解析失败：%1$s</string>
 </resources>

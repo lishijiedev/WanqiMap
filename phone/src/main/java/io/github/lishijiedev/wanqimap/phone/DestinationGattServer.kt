@@ -44,12 +44,18 @@ import android.util.Log
  *
  * 为什么不用「手表主动读」：GATT 单个 ATT 报文容量受 MTU 限制，而客户端按 offset 续读的
  * `readCharacteristic(char, offset)` 要 API 34 才有；改成发送方主动分片则完全不依赖 MTU。
+ *
+ * 三个回调分工（调用方按结构判断，不去匹配提示文字）：
+ *   [onStatus]   给人看的细节消息
+ *   [onStep]     走到哪一步了，驱动界面的进度列表
+ *   [onFinished] 任务终结 —— true = 手表已回执确认；false = 失败（广播开不起来 / 发送失败）
  */
 class DestinationGattServer(
     private val context: Context,
     private val payload: ByteArray,
     private val onStatus: (String) -> Unit,
-    private val onDelivered: () -> Unit
+    private val onStep: (PushStep, StepState) -> Unit,
+    private val onFinished: (Boolean) -> Unit
 ) {
 
     companion object {
@@ -72,6 +78,9 @@ class DestinationGattServer(
 
     @Volatile
     private var delivered = false
+
+    /** [onFinished] 只报一次 —— 失败与送达可能先后到达，不能让调用方重复收尾。 */
+    private var finishedReported = false
 
     private var subscribedDevice: BluetoothDevice? = null
     private var notifyOffset = 0
@@ -96,6 +105,7 @@ class DestinationGattServer(
     private val advertiseCallback = object : AdvertiseCallback() {
         override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
             Log.d(TAG, "advertising started")
+            onStep(PushStep.ADVERTISING, StepState.DONE)
             onStatus("正在等待手表连接…（请保持本页面在前台）")
         }
 
@@ -103,6 +113,7 @@ class DestinationGattServer(
             Log.w(TAG, "advertising failed: $errorCode")
             onStatus("蓝牙广播开启失败（错误码 $errorCode），请确认蓝牙已打开且未开启飞行模式")
             close()
+            reportFinished(false)
         }
     }
 
@@ -116,7 +127,11 @@ class DestinationGattServer(
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
             Log.d(TAG, "connection state=$newState status=$status device=${device.address}")
             when (newState) {
-                BluetoothProfile.STATE_CONNECTED -> onStatus("手表已连接，等待订阅…")
+                BluetoothProfile.STATE_CONNECTED -> {
+                    onStep(PushStep.ADVERTISING, StepState.DONE)
+                    onStep(PushStep.SENDING, StepState.ACTIVE)
+                    onStatus("手表已连接，等待订阅…")
+                }
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     if (delivered) {
                         // 推送已完成，手表断开了：释放 GATT Server 收尾
@@ -149,6 +164,7 @@ class DestinationGattServer(
                 subscribedDevice = device
                 notifyOffset = 0
                 awaitingSendCallback = false
+                onStep(PushStep.SENDING, StepState.ACTIVE)
                 sendNextChunk()
             }
         }
@@ -175,6 +191,7 @@ class DestinationGattServer(
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 onStatus("发送目的地失败（$status）")
                 close()
+                reportFinished(false)
                 return
             }
             sendNextChunk()
@@ -195,8 +212,9 @@ class DestinationGattServer(
             if (characteristic.uuid == BleProtocol.CHARACTERISTIC_ACK) {
                 Log.d(TAG, "ack received: ${value?.toString(Charsets.UTF_8)}")
                 delivered = true
+                onStep(PushStep.CONFIRMING, StepState.DONE)
                 onStatus("已送达手表，导航已开启")
-                onDelivered()
+                reportFinished(true)
                 // 回执到手 = 本次推送的任务已经完成 ⇒ 立刻停广播，之后任何设备都扫不到本机。
                 //
                 // 为什么不把「关」交给手表的断开事件：那是一个无法保证一定到达的信号 ——
@@ -220,6 +238,8 @@ class DestinationGattServer(
         val characteristic = destinationCharacteristic ?: return
 
         if (notifyOffset >= payload.size) {
+            onStep(PushStep.SENDING, StepState.DONE)
+            onStep(PushStep.CONFIRMING, StepState.ACTIVE)
             onStatus("目的地已发送，等待手表回执…")
             return
         }
@@ -233,6 +253,7 @@ class DestinationGattServer(
         if (result != BluetoothStatusCodes.SUCCESS) {
             onStatus("发送目的地失败（$result）")
             close()
+            reportFinished(false)
             return
         }
         Log.d(TAG, "notified [$notifyOffset,$end) mtu=$negotiatedMtu")
@@ -343,6 +364,13 @@ class DestinationGattServer(
         destinationCharacteristic = null
         subscribedDevice = null
         Log.d(TAG, "gatt server closed")
+    }
+
+    /** 上报任务终结，保证 [onFinished] 只触发一次。 */
+    private fun reportFinished(success: Boolean) {
+        if (finishedReported) return
+        finishedReported = true
+        onFinished(success)
     }
 
     /**

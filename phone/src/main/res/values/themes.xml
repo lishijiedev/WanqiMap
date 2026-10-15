@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      系统内置的 Material 主题（API 21 起随系统提供），不需要引入 material 依赖库 ——
+      手机端「不依赖任何第三方库」的约定因此不受影响。
+      只覆盖强调色：默认是 Material 的青色，改成图标主色后与手表端视觉统一。
+    -->
+    <style name="AppTheme" parent="@android:style/Theme.Material.Light">
+        <item name="android:colorAccent">@color/accent</item>
+    </style>
+</resources>

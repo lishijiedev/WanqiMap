@@ -3,7 +3,16 @@
     <!-- 图标底色：白，与手表端保持一致 -->
     <color name="ic_launcher_background">#FFFFFF</color>
 
-    <!-- Key 状态：绿 = 已设置（与图标主色 #348E5C 同系），红 = 未设置（会禁用下方功能） -->
+    <!-- 强调色：取图标主色，按钮波纹与控件选中态与手表端同色系 -->
+    <color name="accent">#348E5C</color>
+
+    <!-- Key 状态：绿 = 已设置（与图标主色同系），红 = 未设置/格式错，琥珀 = 改了没保存 -->
     <color name="key_state_set">#348E5C</color>
     <color name="key_state_missing">#C0392B</color>
+    <color name="key_state_dirty">#B26A00</color>
+
+    <!-- 推送进度三步的状态色：灰 = 待办，蓝 = 进行中，绿 = 完成 -->
+    <color name="step_todo">#9E9E9E</color>
+    <color name="step_active">#1565C0</color>
+    <color name="step_done">#348E5C</color>
 </resources>

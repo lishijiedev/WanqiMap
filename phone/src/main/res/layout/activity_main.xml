@@ -10,73 +10,148 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- 高德 Key 放在最前面：没设置就不允许用下面的功能 -->
-        <TextView
+        <!-- ============ 高德 Key ============
+             Key 一年只填一次，所以已设置且未改动时收成一行，把版面让给真正的主操作。 -->
+
+        <LinearLayout
+            android:id="@+id/keyCollapsed"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/label_api_key"
-            android:textSize="15sp"
-            android:textStyle="bold" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
 
-        <EditText
-            android:id="@+id/editApiKey"
+            <TextView
+                android:id="@+id/textKeyCollapsed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/key_saved_short"
+                android:textColor="@color/key_state_set"
+                android:textSize="13sp" />
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/btnEditKey"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                android:text="@string/action_edit_key"
+                android:textColor="?android:attr/colorAccent"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/keyExpanded"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:hint="@string/hint_api_key"
-            android:importantForAutofill="no"
-            android:inputType="textNoSuggestions"
-            android:maxLines="1"
-            android:textSize="14sp" />
+            android:orientation="vertical">
 
-        <Button
-            android:id="@+id/btnSaveKey"
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/label_api_key"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/editApiKey"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:hint="@string/hint_api_key"
+                android:imeOptions="actionDone"
+                android:importantForAutofill="no"
+                android:inputType="textNoSuggestions"
+                android:maxLines="1"
+                android:textSize="14sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnSaveKey"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:enabled="false"
+                    android:text="@string/action_save_key" />
+
+                <Button
+                    android:id="@+id/btnCancelKey"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:text="@string/action_cancel"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/textKeyState"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <View
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/action_save_key" />
+            android:layout_height="1dp"
+            android:layout_marginTop="16dp"
+            android:background="#1A000000" />
 
-        <TextView
-            android:id="@+id/textKeyState"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textSize="13sp" />
-
+        <!-- ============ 目的地链接：粘贴即自动解析，不再需要单独的「解析」按钮 ============ -->
 
         <EditText
             android:id="@+id/editLink"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="16dp"
             android:gravity="top|start"
             android:hint="@string/hint_input"
             android:importantForAutofill="no"
             android:inputType="textMultiLine|textUri"
             android:textSize="14sp" />
 
+        <!-- 解析结果：只留用户真正要确认的两项（是不是这个地方），坐标与 POI 不展示 -->
         <LinearLayout
+            android:id="@+id/resultCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:orientation="horizontal">
+            android:layout_marginTop="16dp"
+            android:orientation="vertical"
+            android:visibility="gone">
 
-            <Button
-                android:id="@+id/btnParse"
-                android:layout_width="0dp"
+            <TextView
+                android:id="@+id/textResultName"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/action_parse" />
+                android:textSize="16sp"
+                android:textStyle="bold" />
 
-            <Button
-                android:id="@+id/btnPush"
-                android:layout_width="0dp"
+            <TextView
+                android:id="@+id/textResultAddress"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:layout_weight="1"
-                android:enabled="false"
-                android:text="@string/action_push" />
+                android:layout_marginTop="4dp"
+                android:textColor="#666666"
+                android:textSize="13sp" />
         </LinearLayout>
+
+        <Button
+            android:id="@+id/btnPush"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:enabled="false"
+            android:text="@string/action_push" />
 
         <Button
             android:id="@+id/btnStop"
@@ -84,23 +159,46 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:enabled="false"
-            android:text="@string/action_stop" />
+            android:text="@string/action_stop"
+            android:visibility="gone" />
 
-        <TextView
-            android:id="@+id/textResult"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:lineSpacingExtra="4dp"
-            android:textSize="14sp" />
-
+        <!-- 状态行紧跟在操作按钮下方：原来放在页面最底部，键盘弹起或结果变长时会被挤出屏幕 -->
         <TextView
             android:id="@+id/textStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="12dp"
             android:text="@string/status_idle"
-            android:textSize="13sp"
-            android:textStyle="italic" />
+            android:textSize="13sp" />
+
+        <!-- 推送进度：三步逐条点亮。GATT 的每个回调对应哪一步见 PushStep 的说明 -->
+        <LinearLayout
+            android:id="@+id/pushSteps"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/stepAdvertising"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/stepSending"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/stepConfirming"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textSize="13sp" />
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>
