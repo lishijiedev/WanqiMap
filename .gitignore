@@ -16,6 +16,10 @@ local.properties
 .idea/
 app/version.txt
 
+# 高德 SDK：版权归高德，本仓库不再分发。请自行到官网下载后放入这两个目录（见 README「构建」）
+/app/libs/
+/app/src/main/jniLibs/
+
 # 反汇编/分析用的临时产物（高德 SDK 的 javap 输出等），不入库
 /.tmp/
 

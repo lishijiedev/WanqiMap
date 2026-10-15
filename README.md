@@ -70,11 +70,15 @@ SHA1 填什么，取决于你怎么拿到这个 App：
 
 ## 安装
 
-- **手表端**：需要 Wear OS 4 或更新版本（Android 13 / API 33 起）。
-  从本仓库 Releases 下载 `app-release.apk`，用 `adb install` 或手表上的文件管理器安装。
-- **手机端**：Android 8.0 及以上。CI 目前只发布手表端安装包，
-  手机端请自行编译：`./gradlew :phone:assembleRelease`，
-  产物在 `phone/build/outputs/apk/release/`。
+从本仓库 **Releases** 下载两个安装包（作者本地编译签名，签名指纹就是上文那个 SHA1）：
+
+- **手表端 `app-release.apk`** —— 需要 Wear OS 4 或更新版本（Android 13 / API 33 起）。
+  用 `adb install` 或在手表上用文件管理器安装。
+- **手机端 `phone-release.apk`** —— Android 8.0 及以上。
+
+> 两端 `applicationId` 相同，是同一个应用的两个版本，**必须分别装到对应设备**：
+> 手表装 `app-release.apk`，手机装 `phone-release.apk`。
+> 装反了（尤其把手表端装到手机上）会看到「等待手机推送目的地」的界面，且没有 Key 输入框。
 
 首次启动会请求权限：两端都需要蓝牙权限（手表端显示为「附近的设备」）；
 手表端还会请求通知权限，用于表盘上的「导航进行中」指示器。
@@ -83,12 +87,30 @@ SHA1 填什么，取决于你怎么拿到这个 App：
 
 需要 **JDK 17**（AGP 8.5.x 不接受 JDK 21 及以上）。
 
+### 第一步：补上高德 SDK
+
+**本仓库不包含高德 SDK**（版权归高德，本项目不再分发）。clone 之后先自行下载并放入：
+
+| 下载到的文件 | 放到 |
+|---|---|
+| `AMap3DMap_*_AMapNavi_*_AMapSearch_*_AMapLocation_*.jar` | `app/libs/` |
+| `libAMapSDK_NAVI_*.so` | `app/src/main/jniLibs/arm64-v8a/` 与 `app/src/main/jniLibs/armeabi-v7a/` |
+| `libneonui_shared.so`、`libneonuijni_public.so` | 同上两个目录 |
+
+在 [高德开放平台](https://lbs.amap.com/) 的文档中心找到「Android 导航 SDK」的下载页，
+选中导航 SDK 后取上表列出的 jar 与 so。
+
+这两个目录已经写进 `.gitignore`，你补进去的文件不会被提交，也不影响本地编译。
+
+### 第二步：编译
+
 ```bash
 ./gradlew :app:assembleDebug      # 手表端
 ./gradlew :phone:assembleDebug    # 手机端
 ```
 
-高德 SDK 的 jar 与原生库位于 `app/libs/` 与 `app/src/main/jniLibs/`，从高德官网下载后放入这两个目录即可。
+仓库不配置 CI —— 云端构建机上没有高德 SDK，跑了也出不了包。
+发布用的 APK 由作者本地编译后上传到 Releases。
 
 ## 合规声明
 
@@ -100,6 +122,7 @@ SHA1 填什么，取决于你怎么拿到这个 App：
    商业使用的授权。本项目本身免费提供，不含广告与付费功能。
 3. 面向骑行与步行场景，**请勿用于车载导航**。
 4. 高德 SDK 的版权与许可归高德所有，与本项目代码的许可证相互独立。
+   **本仓库不分发 SDK 本身**（也不随源码提供），请自行从高德官网获取，并遵守其许可条款。
 
 ## 许可
 
