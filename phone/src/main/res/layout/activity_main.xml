@@ -10,10 +10,19 @@
         android:orientation="vertical"
         android:padding="16dp">
 
+        <!-- 高德 Key 放在最前面：没设置就不允许用下面的功能 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/label_api_key"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
         <EditText
             android:id="@+id/editApiKey"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
             android:hint="@string/hint_api_key"
             android:importantForAutofill="no"
             android:inputType="textNoSuggestions"
@@ -26,6 +35,14 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:text="@string/action_save_key" />
+
+        <TextView
+            android:id="@+id/textKeyState"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textSize="13sp" />
+
 
         <EditText
             android:id="@+id/editLink"

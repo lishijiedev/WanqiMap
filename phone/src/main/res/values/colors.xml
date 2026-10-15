@@ -2,4 +2,8 @@
 <resources>
     <!-- 图标底色：白，与手表端保持一致 -->
     <color name="ic_launcher_background">#FFFFFF</color>
+
+    <!-- Key 状态：绿 = 已设置（与图标主色 #348E5C 同系），红 = 未设置（会禁用下方功能） -->
+    <color name="key_state_set">#348E5C</color>
+    <color name="key_state_missing">#C0392B</color>
 </resources>

@@ -8,10 +8,14 @@
 
     <string name="status_idle">等待解析…</string>
 
-    <!-- 高德 Key：由使用者自行到高德开放平台申请，手表端导航靠它通过鉴权 -->
-    <string name="hint_api_key">高德 Key（32 位十六进制，手表导航必需）</string>
+    <!-- 高德 Key：由使用者自行到高德开放平台申请，手表端导航靠它通过鉴权。
+         没设置时手机端不允许解析与推送 —— 「必须先设 Key 才能用」就落在这里。 -->
+    <string name="label_api_key">高德 Key（必填）</string>
+    <string name="hint_api_key">32 位十六进制，在高德开放平台「Android 平台」的 Key 里复制</string>
     <string name="action_save_key">保存 Key</string>
+    <string name="key_state_missing">未设置 —— 手表导航无法通过高德鉴权，解析与推送已禁用</string>
+    <string name="key_state_set">已设置</string>
     <string name="status_key_saved">Key 已保存，可以推送目的地了</string>
     <string name="status_key_invalid">Key 格式不对：应为 32 位十六进制字符（0-9、a-f）</string>
-    <string name="status_need_api_key">请先填写并保存高德 Key —— 手表端导航需要它才能通过高德鉴权</string>
+    <string name="toast_need_api_key">请先填写并保存高德 Key，否则无法使用本应用</string>
 </resources>

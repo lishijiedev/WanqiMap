@@ -50,6 +50,7 @@ class MainActivity : Activity() {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private lateinit var editApiKey: EditText
+    private lateinit var textKeyState: TextView
     private lateinit var editLink: EditText
     private lateinit var textResult: TextView
     private lateinit var textStatus: TextView
@@ -86,6 +87,7 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_main)
 
         editApiKey = findViewById(R.id.editApiKey)
+        textKeyState = findViewById(R.id.textKeyState)
         editLink = findViewById(R.id.editLink)
         textResult = findViewById(R.id.textResult)
         textStatus = findViewById(R.id.textStatus)
@@ -115,6 +117,8 @@ class MainActivity : Activity() {
         }
 
         refreshKeyState()
+        // 一进应用就把「必须先设 Key」讲清楚；提示文案只有 requireApiKey() 那一份，各入口复用
+        requireApiKey()
         handleIntent(intent)
     }
 
@@ -183,14 +187,26 @@ class MainActivity : Activity() {
 
     private fun hasApiKey(): Boolean = AmapKeyStore.isValidFormat(AmapKeyStore.load(this))
 
-    /** 没 Key 就不允许解析/推送 —— 否则推过去手表也只会是一张空白地图。 */
+    /**
+     * 没 Key 就不允许解析/推送 —— 否则推过去手表也只会是一张空白地图。
+     *
+     * 状态直接写在 Key 输入框下面（红/绿），比按钮置灰更容易被看见。
+     */
     private fun refreshKeyState() {
         val ready = hasApiKey()
         btnParse.isEnabled = ready
-        if (!ready) {
-            btnPush.isEnabled = false
-            status(getString(R.string.status_need_api_key))
-        }
+        if (!ready) btnPush.isEnabled = false
+        textKeyState.setText(if (ready) R.string.key_state_set else R.string.key_state_missing)
+        textKeyState.setTextColor(
+            getColor(if (ready) R.color.key_state_set else R.color.key_state_missing)
+        )
+    }
+
+    /** 所有「必须有 Key 才能做」的入口统一走这里，保证提示只有一份。 */
+    private fun requireApiKey(): Boolean {
+        if (hasApiKey()) return true
+        Toast.makeText(this, R.string.toast_need_api_key, Toast.LENGTH_LONG).show()
+        return false
     }
 
     // ------------------------------------------------------------------ 入参处理
@@ -213,10 +229,7 @@ class MainActivity : Activity() {
     // ------------------------------------------------------------------ 解析
 
     private fun startParsing(rawText: String) {
-        if (!hasApiKey()) {
-            status(getString(R.string.status_need_api_key))
-            return
-        }
+        if (!requireApiKey()) return
         if (rawText.isBlank()) {
             status("请先粘贴高德分享链接")
             return
@@ -262,10 +275,7 @@ class MainActivity : Activity() {
     // ------------------------------------------------------------------ 推送
 
     private fun onPushClicked() {
-        if (!hasApiKey()) {
-            status(getString(R.string.status_need_api_key))
-            return
-        }
+        if (!requireApiKey()) return
         val destination = parsed ?: return
         if (blePermissions.isNotEmpty() && !hasBlePermissions()) {
             pendingPush = destination
