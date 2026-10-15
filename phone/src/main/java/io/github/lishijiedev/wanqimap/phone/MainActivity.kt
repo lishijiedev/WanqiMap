@@ -97,6 +97,9 @@ class MainActivity : Activity() {
     /** 等权限结果时临时存一下，授权后立刻转入 [activePush]。 */
     private var pendingPush: Destination? = null
 
+    /** 当前这条目的地是否已经成功送达过 —— 决定主按钮是「推送到手表」还是「重新推送到手表」。 */
+    private var pushDone = false
+
     /** 上次送去解析的原文，用来避免自动解析对同一段文本重复发请求。 */
     private var lastParsedInput: String? = null
 
@@ -151,6 +154,9 @@ class MainActivity : Activity() {
             activePush = runCatching { Destination.fromJson(json) }.getOrNull()
         }
 
+        // 界面初始态由这里统一给，不依赖布局文件上的初始可见性 ——
+        // 否则「停止等待」显不显示就有两个来源，出问题时无从判断是谁生效的。
+        setWaiting(false)
         refreshKeyState()
         handleIntent(intent)
     }
@@ -366,6 +372,7 @@ class MainActivity : Activity() {
     /** 上一次的解析结果与进度一并作废：开始新一次解析时它们就该翻篇。 */
     private fun clearParsed() {
         parsed = null
+        pushDone = false
         btnPush.isEnabled = false
         resultCard.visibility = View.GONE
         pushSteps.visibility = View.GONE
@@ -374,7 +381,8 @@ class MainActivity : Activity() {
     private fun showParsed(result: AmapShareLinkParser.Result) {
         val destination = result.destination
         parsed = destination
-        btnPush.isEnabled = true
+        // 新目的地一律回到「推送到手表」：按钮可用性、文案、「停止等待」的隐藏都在这一个出口
+        setWaiting(false)
 
         // 只展示用户要确认的两项：是不是这个地方。坐标与 POI 对他没有意义
         textResultName.text = destination.name.ifBlank { getString(R.string.result_name_missing) }
@@ -461,6 +469,7 @@ class MainActivity : Activity() {
 
         gattServer?.close()
         activePush = destination
+        pushDone = false
         setWaiting(true)
         showSteps()
         status(getString(R.string.status_opening_ble))
@@ -468,26 +477,23 @@ class MainActivity : Activity() {
         val server = DestinationGattServer(
             context = this,
             payload = payload,
-            onStatus = { message -> status(message) },
-            onStep = { step, state -> showStep(step, state) },
-            onFinished = { _ ->
-                // 任务到此结束：已送达，或失败（重试也没有意义）。清掉任务状态后，
-                // 页面再回到前台就不会重新广播。具体结果由 onStatus 写进状态行。
-                activePush = null
-                setWaiting(false)
-            }
+            // 三个回调都回主线程再动界面：GATT 的回调线程不由我们决定，
+            // 直接在里面改 View 有可能整段更新被丢掉，界面就会停在上一次任务的状态上。
+            onStatus = { message -> onMain { status(message) } },
+            onStep = { step, state -> onMain { showStep(step, state) } },
+            onFinished = { success -> onMain { onPushFinished(success) } }
         )
         gattServer = server
         if (!server.open()) {
             gattServer = null
-            activePush = null
-            setWaiting(false)
+            onPushFinished(false)
         }
     }
 
     /** 用户主动放弃本次任务：清状态 + 关广播，之后回到前台也不会再自动广播。 */
     private fun stopWaiting() {
         activePush = null
+        pushDone = false
         gattServer?.close()
         gattServer = null
         setWaiting(false)
@@ -495,8 +501,32 @@ class MainActivity : Activity() {
         status(getString(R.string.status_stopped))
     }
 
+    /**
+     * 任务终结（送达或失败）唯一的收尾入口。
+     *
+     * 收尾与「显示哪句提示」是两件事：无论哪种结局，界面都要立刻回到"没有等待中的任务"，
+     * 所以「停止等待」不可能留在送达之后的界面上。送达过的目的地，主按钮改叫「重新推送」——
+     * 那时它确实只是「再推一次」，而不是「开始推送」。
+     */
+    private fun onPushFinished(success: Boolean) {
+        activePush = null
+        if (success) pushDone = true
+        setWaiting(false)
+    }
+
+    /**
+     * 把界面更新挪回主线程再执行。
+     *
+     * [DestinationGattServer] 的回调跑在蓝牙栈交给我们的线程上，是不是主线程不由本项目决定；
+     * 在非主线程直接改 View 会抛异常，那段更新（可能正好是任务收尾）就会被整段丢掉。
+     */
+    private fun onMain(block: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) block() else mainHandler.post(block)
+    }
+
     private fun setWaiting(waiting: Boolean) {
         btnPush.isEnabled = !waiting && parsed != null
+        btnPush.setText(if (pushDone) R.string.action_push_again else R.string.action_push)
         btnStop.isEnabled = waiting
         btnStop.visibility = if (waiting) View.VISIBLE else View.GONE
     }

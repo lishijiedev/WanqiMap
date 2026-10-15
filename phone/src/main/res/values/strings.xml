@@ -3,6 +3,7 @@
 
     <string name="hint_input">粘贴高德分享链接，或从高德「分享」直接发到本应用</string>
     <string name="action_push">推送到手表</string>
+    <string name="action_push_again">重新推送到手表</string>
     <string name="action_stop">停止等待</string>
     <string name="action_cancel">取消</string>
 

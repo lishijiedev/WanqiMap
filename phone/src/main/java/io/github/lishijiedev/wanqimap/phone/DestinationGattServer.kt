@@ -79,8 +79,15 @@ class DestinationGattServer(
     @Volatile
     private var delivered = false
 
-    /** [onFinished] 只报一次 —— 失败与送达可能先后到达，不能让调用方重复收尾。 */
-    private var finishedReported = false
+    /**
+     * 失败与送达各自只报一次。
+     *
+     * 为什么要分开记：这两种结局可能**先后**到达（发送回调报失败，随后手表仍把回执写了回来）。
+     * 用一个共用的开关时，先到的那个会把后面那个永久挡掉 —— 表现就是「明明显示了已送达，
+     * 界面却还停在上一次任务的状态里」。调用方的收尾是幂等的，重复上报无害，漏报才有害。
+     */
+    private var failureReported = false
+    private var successReported = false
 
     private var subscribedDevice: BluetoothDevice? = null
     private var notifyOffset = 0
@@ -212,9 +219,12 @@ class DestinationGattServer(
             if (characteristic.uuid == BleProtocol.CHARACTERISTIC_ACK) {
                 Log.d(TAG, "ack received: ${value?.toString(Charsets.UTF_8)}")
                 delivered = true
+                // 先收尾、再刷界面：任务终结是需要调用方立刻处理的事实，
+                // 不能排在两条只是"给人看的"界面更新后面 —— 万一其中一条出问题，
+                // 收尾就跟着一起丢了，界面会停在上一次任务的状态里（停止等待按钮留在原地）。
+                reportFinished(true)
                 onStep(PushStep.CONFIRMING, StepState.DONE)
                 onStatus("已送达手表，导航已开启")
-                reportFinished(true)
                 // 回执到手 = 本次推送的任务已经完成 ⇒ 立刻停广播，之后任何设备都扫不到本机。
                 //
                 // 为什么不把「关」交给手表的断开事件：那是一个无法保证一定到达的信号 ——
@@ -366,10 +376,11 @@ class DestinationGattServer(
         Log.d(TAG, "gatt server closed")
     }
 
-    /** 上报任务终结，保证 [onFinished] 只触发一次。 */
+    /** 上报任务终结，两种结局各自只触发一次。 */
     private fun reportFinished(success: Boolean) {
-        if (finishedReported) return
-        finishedReported = true
+        val reported = if (success) successReported else failureReported
+        if (reported) return
+        if (success) successReported = true else failureReported = true
         onFinished(success)
     }
 
