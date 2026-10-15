@@ -1,0 +1,32 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+        maven { url = 'https://maven.aliyun.com/repository/google' }
+        maven { url = 'https://maven.aliyun.com/repository/public' }
+        maven { url = 'https://maven.aliyun.com/repository/jcenter' }
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        maven { url = 'https://maven.aliyun.com/repository/google' }
+        maven { url = 'https://maven.aliyun.com/repository/public' }
+        maven { url = 'https://maven.aliyun.com/repository/jcenter' }
+
+        google()
+        mavenCentral()
+
+        flatDir {
+            dirs 'app/libs'
+        }
+    }
+}
+
+rootProject.name = "WanqiMap"
+
+// :app   = Wear OS 手表端（原工程）
+// :phone = 手机端（解析高德分享链接并通过蓝牙 BLE 把目的地推送给手表）
+include ':app'
+include ':phone'

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 左下角「回到导航视角」图标：同心圆靶心（总览中显示）。
+     尺寸与 ic_overview 保持一致（30dp），避免切换视角时图标大小跳动。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="26dp"
+    android:height="26dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M12,3.5 A8.5,8.5 0 1,0 12,20.5 A8.5,8.5 0 1,0 12,3.5 Z"
+        android:strokeColor="#FF222222"
+        android:strokeWidth="2.2" />
+    <path
+        android:fillColor="#FF222222"
+        android:pathData="M12,8.2 A3.8,3.8 0 1,0 12,15.8 A3.8,3.8 0 1,0 12,8.2 Z" />
+</vector>

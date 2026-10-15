@@ -1,0 +1,41 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'io.github.lishijiedev.wanqimap.phone'
+    compileSdk 33
+
+    defaultConfig {
+        // 必须与手表端 :app 保持同一个 applicationId。
+        // 两端同包名 + 同签名是能让系统把两个 App 识别为"同一个应用的手机版/手表版"的前提，
+        // 后续如果换成其它通道（如 RFCOMM）也便于沿用。
+        applicationId "io.github.lishijiedev.wanqimap"
+        minSdk 26
+        targetSdk 33
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // 与手表端一致沿用 debug 签名：保证两端签名相同（BLE 通信与"同一应用"识别的前提），
+            // 同时也让 assembleRelease 产出的是可直接安装的包，而不是 unsigned 包。
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+// 手机端刻意不依赖任何第三方库（也不引入高德 SDK）：
+// 只用 android.* 与 org.json，避免再往手机侧塞一份高德 Key 绑定和几十 MB 的原生库。

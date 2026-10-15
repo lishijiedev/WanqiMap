@@ -1,0 +1,95 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+// 高德 Key 不写进仓库：从 local.properties 读取（该文件已在 .gitignore 中，不会被提交）。
+// 换 Key 只需要改 local.properties 里的 amap.api.key 一行。
+def localProps = new Properties()
+def localPropsFile = rootProject.file('local.properties')
+if (localPropsFile.exists()) {
+    localPropsFile.withInputStream { localProps.load(it) }
+}
+def amapApiKey = localProps.getProperty('amap.api.key') ?: ''
+if (amapApiKey.isEmpty()) {
+    logger.warn('[wanqimap] 未配置 amap.api.key：地图与导航将无法通过高德鉴权。请在 local.properties 中补上。')
+}
+
+android {
+    namespace 'io.github.lishijiedev.wanqimap'
+    compileSdk 33
+
+    defaultConfig {
+        applicationId "io.github.lishijiedev.wanqimap"
+        // minSdk 33 = Android 13 = Wear OS 4+。这个值被蓝牙链路锁死了：
+        // 项目用了三个 API 33 才有的新重载（BluetoothGatt#writeDescriptor/#writeCharacteristic
+        // 与 BluetoothGattServer#notifyCharacteristicChanged 的带 value 版本，旧重载在 33 已废弃）。
+        // 若要降到 30，需把这三处改回 setValue() 旧写法，另需处理 VibratorManager(31)
+        // 与 BLUETOOTH_SCAN/CONNECT 权限(31)。
+        minSdk 33
+        targetSdk 33
+        versionCode 1
+        versionName "1.0"
+
+        ndk {
+            //noinspection ChromeOsAbiSupport
+            abiFilters "armeabi-v7a", "arm64-v8a"
+        }
+
+        manifestPlaceholders = [AMAP_API_KEY: amapApiKey]
+    }
+
+    buildTypes {
+        release {
+            // release 走 R8（去掉未用代码）+ debuggable=false
+            // ——后者才是性能大头：安装时 ART 会做完整 AOT 编译，
+            // 而 debug 包大量代码走解释器/JIT，在手表这种弱芯片上差别很明显。
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+
+            // 关键：release 沿用 debug 签名，两个原因
+            //   ① 高德 Key 绑定「包名 + 签名 SHA1」，换签名会导致地图/导航鉴权失败（白屏）
+            //   ② 同签名才能覆盖安装，不会被迫先卸载（也就不会丢 SharedPreferences）
+            signingConfig signingConfigs.debug
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    // 已按「零引用」逐个核实并移除以下依赖（本项目自己实现的部分都在 android.* 与 org.json 上，
+    // 不依赖它们）：
+    //   androidx.percentlayout          布局里没有 PercentLayout
+    //   androidx.legacy:legacy-support-v4  没有任何 android.support.* 引用
+    //   androidx.recyclerview           没有 RecyclerView
+    //   androidx.wear:wear-input        没有 WearableButtons / RemoteInput 用法
+    //   com.google.guava                没有 com.google.common 引用
+    //   com.google.code.gson            没有 com.google.gson 引用（用的是内置 org.json）
+    //   androidx.wear:wear              没有 WearableActivity / BoxInsetLayout 等用法
+    // 实际用到的只有下面这几个。如果再需要用某个库，直接把对应那一行加回来即可。
+
+    // NotificationCompat（前台保活通知）
+    implementation "androidx.core:core:1.10.1"
+    // OngoingActivity / Status（表盘上的进行中活动）
+    implementation "androidx.wear:wear-ongoing:1.0.0"
+
+    // navi.xml 用到 ConstraintLayout；CardView 经核查全项目 0 处引用，已移除
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+
+    // 高德 SDK（AMap3DMap / AMapNavi / AMapSearch / AMapLocation），放在 app/libs/
+    implementation fileTree(dir: 'libs', includes: ['*.jar'])
+
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.9.24"
+}
+
+tasks.register('generateVersionTxt') {
+    doLast {
+        file("./version.txt").text = android.defaultConfig.versionName
+    }
+}

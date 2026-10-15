@@ -1,0 +1,38 @@
+<resources>
+    <string name="app_name">腕骑地图</string>
+
+    <string name="status_waiting">正在等待手机推送目的地…\n打开手机端「腕骑地图」解析高德链接</string>
+    <string name="status_ble_denied">缺少蓝牙权限，无法接收手机推送。请在系统设置里为本应用开启「附近的设备」权限。</string>
+
+    <!-- 导航 HUD 状态提示 -->
+    <string name="hud_destination_fallback">目的地</string>
+    <string name="hud_calculating">正在规划到「%1$s」的路线…</string>
+    <string name="hud_waiting_gps">等待卫星定位…（%1$d/%2$d）</string>
+    <string name="hud_route_failed">路线规划失败，请确认手表已定位且网络可用</string>
+    <string name="hud_engine_failed">导航引擎初始化失败</string>
+    <string name="hud_no_api_key">未收到高德 Key，请在手机端填写后重新推送</string>
+    <string name="hud_need_location">需要定位权限才能规划路线</string>
+    <string name="hud_start_failed">导航启动失败</string>
+    <string name="hud_gps_off">请打开手表的定位开关</string>
+    <string name="hud_arrived">已到达目的地</string>
+
+    <!-- 导航 HUD 转向卡片 -->
+    <string name="hud_unknown_road">无名道路</string>
+    <string name="hud_remaining">剩余 %1$s · %2$s</string>
+
+    <!-- HUD 按钮的无障碍描述（按钮上是图标，没有文字） -->
+    <string name="hud_cd_back">退出导航</string>
+    <string name="hud_cd_overview">切换到总览</string>
+    <string name="hud_cd_recenter">回到导航视角</string>
+    <string name="hud_cd_zoom_in">放大</string>
+    <string name="hud_cd_zoom_out">缩小</string>
+
+    <!-- 退出确认 -->
+    <string name="hud_exit_confirm">要退出导航吗？</string>
+    <string name="hud_exit_yes">退出</string>
+    <string name="hud_exit_no">继续导航</string>
+
+    <!-- 导航期间的前台保活通知 -->
+    <string name="navi_notification_title">骑行导航进行中</string>
+    <string name="navi_notification_text">腕骑地图 正在为你导航，请保持手表与应用运行</string>
+</resources>

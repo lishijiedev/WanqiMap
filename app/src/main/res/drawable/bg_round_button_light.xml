@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  左下「切换总览 / 回到导航视角」按钮背景：半透明白圆。
+  与缩放胶囊同色（#D9FFFFFF），里面配深色图标，和各家地图的观感一致。
+
+  同样套 5dp inset：视图 48dp 保证可点，可见圆 38dp。
+-->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#1F000000">
+    <item>
+        <inset
+            android:insetLeft="5dp"
+            android:insetTop="5dp"
+            android:insetRight="5dp"
+            android:insetBottom="5dp">
+            <shape android:shape="oval">
+                <solid android:color="#D9FFFFFF" />
+            </shape>
+        </inset>
+    </item>
+</ripple>

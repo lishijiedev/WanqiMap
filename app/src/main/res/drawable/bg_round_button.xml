@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  左上「退出导航」按钮背景：深灰半透明圆。
+  这个颜色是刻意与其它按钮不同的（用户要求退出按钮保持深色，便于和导航类按钮区分开）。
+
+  外面套 5dp inset：视图尺寸留 48dp 以满足手表的最小可点面积，
+  可见圆只有 38dp，与左下视角切换按钮直径一致。
+-->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#4DFFFFFF">
+    <item>
+        <inset
+            android:insetLeft="5dp"
+            android:insetTop="5dp"
+            android:insetRight="5dp"
+            android:insetBottom="5dp">
+            <shape android:shape="oval">
+                <solid android:color="#CC4A4A4A" />
+            </shape>
+        </inset>
+    </item>
+</ripple>

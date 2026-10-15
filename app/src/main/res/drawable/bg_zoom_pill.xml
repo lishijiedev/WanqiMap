@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  右下缩放胶囊背景：半透明白圆角条，与左下视角切换按钮同色（#D9FFFFFF）。
+  上下各留 5dp inset：视图高度 48dp 保证可点，可见胶囊高度 38dp，两端圆角 = 38/2。
+-->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#1F000000">
+    <item>
+        <inset
+            android:insetTop="5dp"
+            android:insetBottom="5dp">
+            <shape android:shape="rectangle">
+                <corners android:radius="19dp" />
+                <solid android:color="#D9FFFFFF" />
+            </shape>
+        </inset>
+    </item>
+</ripple>

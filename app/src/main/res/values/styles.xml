@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="WearAppTheme" parent="@android:style/Theme.Translucent.NoTitleBar">
+        <item name="android:windowSwipeToDismiss">false</item>
+    </style>
+
+    <!--
+      MainActivity 现在是一个真实界面（等待手机推送），需要不透明的深色底，
+      所以单独给它一个主题；高德导航相关页面继续用上面的 WearAppTheme。
+    -->
+    <style name="WearWaitingTheme" parent="@android:style/Theme.DeviceDefault">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowSwipeToDismiss">false</item>
+    </style>
+</resources>

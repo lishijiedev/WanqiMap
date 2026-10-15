@@ -1,0 +1,23 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+build/
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+.idea/
+app/version.txt
+
+# 反汇编/分析用的临时产物（高德 SDK 的 javap 输出等），不入库
+/.tmp/
+
+# Agent Dynamic Task Board
+.agents/TASK.md

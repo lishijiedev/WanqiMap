@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 解析高德分享短链需要跟随 302 跳转 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Android 12(API 31) 之前的蓝牙权限 -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+
+    <!-- Android 12+ 蓝牙权限。手机侧只做外围设备广播与连接，不扫描，
+         所以不需要 BLUETOOTH_SCAN，也就完全不涉及定位授权。 -->
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <uses-feature
+        android:name="android.hardware.bluetooth_le"
+        android:required="true" />
+
+    <!-- allowBackup=false：用户填的高德 Key 存在应用私有目录，关掉云备份／换机迁移，
+         保证它只留在本机，卸载即随应用目录一起消失。 -->
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault.Light">
+
+        <activity
+            android:name="io.github.lishijiedev.wanqimap.phone.MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:launchMode="singleTask">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- 从高德/微信等应用「分享」文本（含分享链接）到本应用 -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+
+            <!-- 直接点开高德分享短链时唤起本应用。
+                 如果希望这类链接仍旧用浏览器/高德打开，删掉下面这个 intent-filter 即可。 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="surl.amap.com" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
